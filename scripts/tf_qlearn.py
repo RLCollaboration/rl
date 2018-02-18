@@ -24,8 +24,6 @@ import time
 
 import tensorflow as tf
 
-import cifar10
-
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('train_dir', '/tmp/cifar10_train',
@@ -49,18 +47,18 @@ def train():
         r = tf.placeholder()
         s = tf.placeholder()
 
-        next_action = ?
+        # next_action = ?
 
         # Build a Graph that computes the logits predictions from the
         # inference model.
-        logits = cifar10.inference(images)
+        # logits = cifar10.inference(images)
 
         # Calculate loss.
-        loss = cifar10.loss(logits, labels)
+        # loss = cifar10.loss(logits, labels)
 
         # Build a Graph that trains the model with one batch of examples and
         # updates the model parameters.
-        train_op = cifar10.train(loss, global_step)
+        # train_op = cifar10.train(loss, global_step)
 
         class _LoggerHook(tf.train.SessionRunHook):
             """Logs loss and runtime."""
