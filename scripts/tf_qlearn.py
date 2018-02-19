@@ -23,20 +23,33 @@ tf.app.flags.DEFINE_integer('log_frequency', 10,
                             """How often to log results to the console.""")
 
 
-def dnn(name, input, layer_sizes, actions):
-  with tf.name_scope(name=name):
+def create_layer(scope_name, input, layer_size, activation=None, trainable=True):
+  with tf.variable_scope(scope_name):
+    input_size = input.get_shape()[1]
+    w = tf.get_variable("weights", (input_size, layer_size), trainable=trainable, dtype=tf.float32)
+    b = tf.get_variable("bias", (layer_size,), initializer=tf.zeros_initializer(),
+                        trainable=trainable, dtype=tf.float32)
+    output = tf.matmul(input, w) + b
+    if activation:
+      output = activation(output)
+    return output, w, b
+
+
+def create_dnn(name, input, layer_sizes, actions, trainable=True):
+  with tf.variable_scope(name):
     previous = input
     variables = []
-    for layer_size in layer_sizes:
-      previous = tf.layers.dense(inputs=previous, units=layer_size, activation=tf.nn.relu,
-                                 kernel_initializer=tf.truncated_normal_initializer(),
-                                 bias_initializer=tf.truncated_normal_initializer())
-      variables += previous.variables
-    logits = tf.layers.dense(inputs=previous, units=layer_size, activation=None,
-                             kernel_initializer=tf.truncated_normal_initializer(),
-                             bias_initializer=tf.truncated_normal_initializer())
-    variables += logits.variables
-    action_distribution = tf.softmax(logits)
+    for i, layer_size in enumerate(layer_sizes):
+      previous, w, b = create_layer("Hidden_{}".format(i), previous,
+                                    layer_size, activation=tf.nn.relu,
+                                    trainable=trainable)
+      variables += [w, b]
+
+    logits, w, b = create_layer("Logits", previous,
+                                actions, activation=None,
+                                trainable=trainable)
+    variables += [w, b]
+    action_distribution = tf.nn.softmax(logits)
   return action_distribution, variables
 
 
