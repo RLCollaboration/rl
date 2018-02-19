@@ -45,12 +45,12 @@ def create_dnn(name, input, layer_sizes, actions, trainable=True):
                                     trainable=trainable)
       variables += [w, b]
 
-    logits, w, b = create_layer("Logits", previous,
-                                actions, activation=None,
-                                trainable=trainable)
+    action_rewards, w, b = create_layer("Final", previous,
+                                        actions, activation=None,
+                                        trainable=trainable)
     variables += [w, b]
-    action_distribution = tf.nn.softmax(logits)
-  return action_distribution, variables
+    # action_distribution = tf.nn.softmax(logits)
+  return action_rewards, variables
 
 
 def train():
