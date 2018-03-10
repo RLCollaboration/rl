@@ -11,16 +11,25 @@ class EnvWrapper(object):
             obs_hook (callable): A callback function that transforms observations from the environment into a more
                                  convenient data structure.
     """
-    def __init__(self, name, obs_shape=None, obs_hook=None):
+    def __init__(self, name, obs_shape=None, obs_hook=None, render=False):
 
-        self.env = gym.make(name)
-        self.env.reset()
+        self._env = gym.make(name)
 
         self.obs_size = obs_shape
         self.obs_hook = obs_hook or (lambda x: x)
+        self.render = render
+
+        # Save initial state from environment reset (transformed)
+        self.initial_state = self.reset()
 
     def step(self, action):
-        s, r, done, info = self.env.step(action)
+        s, r, done, info = self._env.step(action)
+
+        if self.render:
+            self._env.render()
+
+        if done:
+            self.reset()
 
         # TODO: Log info?
 
@@ -28,13 +37,14 @@ class EnvWrapper(object):
 
     @property
     def action_space(self):
-        return self.env.action_space
+        return self._env.action_space
 
     @property
     def observation_space(self):
-        return self.env.observation_space
+        return self._env.observation_space
 
     def reset(self):
-        self.env.reset()
+        self.initial_state = self.obs_hook(self._env.reset())
+        return self.initial_state
 
 
