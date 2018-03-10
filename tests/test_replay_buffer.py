@@ -3,7 +3,7 @@ from datatypes import ReplayBuffer
 
 
 class TestReplayBuffer(unittest.TestCase):
-    def test_init_queue(self):
+    def test_init_buffer(self):
         MAX_SIZE = 10
 
         b = ReplayBuffer(max_size=MAX_SIZE)
@@ -21,23 +21,33 @@ class TestReplayBuffer(unittest.TestCase):
 
         # Test length is correct
         length = 0
-        for n in xrange(10):
+        for n in xrange(MAX_SIZE):
             b.append(n)
             length += 1
             self.assertEqual(len(b), length)
 
-        # Test all elements added to queue exactly once
+            # Verify that buffer is not full until max size is reached
+            if length < MAX_SIZE:
+                self.assertFalse(b.full())
+            else:
+                self.assertTrue(b.full())
+
+        # Test all elements added to buffer exactly once
         for n in xrange(10):
             self.assertEqual(b.count(n), 1)
 
-        # test max size constraint
+        # test max size constraint (size does not change when appending to buffer at max size)
         b.append(length + 1)
         self.assertEqual(len(b), MAX_SIZE)
+
+        # test that when adding another element at buffer max capacity preserves full-ness
+        self.assertTrue(b.full())
 
         # test FIFO (first element should be removed)
         for n in xrange(10, 20):
             b.append(n)
-            self.assertEqual(b.count(n - 10), 0, msg="{} should have been removed from queue".format(n - 10))
+            self.assertEqual(b.count(n - 10), 0, msg="{} should have been removed from buffer".format(n - 10))
+
 
     def test_random_sample(self):
         b = ReplayBuffer(max_size=100)

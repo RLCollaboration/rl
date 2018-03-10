@@ -12,6 +12,9 @@ class ReplayBuffer(object):
     def __len__(self):
         return len(self._elements)
 
+    def full(self):
+        return len(self) == self.max_size
+
     def append(self, obj):
         self._last_ndx = (self._last_ndx + 1) % self.max_size
         if len(self) < self.max_size:
