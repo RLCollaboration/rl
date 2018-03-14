@@ -1,7 +1,7 @@
 import gym
 from collections import namedtuple
 
-env_transition = namedtuple('Transition', ['state', 'action', 'next_state', 'reward', 'is_terminal'], verbose=True)
+env_transition = namedtuple('Transition', ['state', 'action', 'next_state', 'reward', 'is_terminal'], verbose=False)
 
 
 class EnvWrapper(object):
