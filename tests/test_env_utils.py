@@ -1,7 +1,5 @@
 import unittest
-import gym
-
-from env_utils import EnvWrapper, env_transition
+from env_utils import EnvWrapper
 
 TEST_ENV_NAME = 'CartPole-v0'
 
@@ -40,4 +38,3 @@ class TestEnvWrapper(unittest.TestCase):
         env = EnvWrapper(TEST_ENV_NAME, obs_hook=lambda x: 1)
         trans = env.step(env.action_space.sample())
         self.assertEqual(trans.next_state, 1)
-
