@@ -26,18 +26,26 @@ class FakeEnv(object):
 
 class MyTestCase(unittest.TestCase):
     # Test greedy action (random value < epsilon)
-    def test_eps_greedy_greedy_action(self):
+    def test_eps_greedy_greedy_action1(self):
         with patch('common_utils.random', return_value=0.01) as mock_random:
             Q = FakeDNN()
             env = FakeEnv()
             self.assertEqual(eps_greedy(env=env, epsilon=0.9, Q=Q), 1)
 
-    # Test random action (random value >= epsilon)
+    # Test greedy action (random value < epsilon)
+    def test_eps_greedy_greedy_action2(self):
+        with patch('common_utils.random', return_value=0.9) as mock_random:
+            Q = FakeDNN()
+            env = FakeEnv()
+            self.assertEqual(eps_greedy(env=env, epsilon=0.9, Q=Q), 1)
+
+    # Test random action (random value > epsilon)
     def test_eps_greedy_random_action(self):
-        with patch('common_utils.random', return_value=0.99) as mock_random:
+        with patch('common_utils.random', return_value=0.91) as mock_random:
             Q = FakeDNN()
             env = FakeEnv()
             self.assertEqual(eps_greedy(env=env, epsilon=0.9, Q=Q), 17)
+
 
 
 if __name__ == '__main__':
