@@ -52,13 +52,6 @@ class DeepNN(object):
 
             return output, w, b
 
-    def __call__(self, *args, **kwargs):
-        states = list(args[0]) if isinstance(args[0], list) else args[0]
-        sess = kwargs['session'] \
-            if 'session' in kwargs and kwargs['session'] is not None \
-            else tf.get_default_session()
-        return sess.run([self.action_values], feed_dict={self.inputs: states})
-
 
 class ReplayBuffer(object):
     def __init__(self, max_size=100):

@@ -7,6 +7,8 @@ import time
 
 from datetime import datetime
 
+from matplotlib.mlab import cohere_pairs
+
 from common_utils import eps_greedy
 from env_utils import EnvWrapper
 from datatypes import ReplayBuffer, DeepNN
@@ -30,7 +32,7 @@ tf.app.flags.DEFINE_boolean('render', True, 'Whether to render a display of the 
 tf.app.flags.DEFINE_integer('steps', 1000000, 'Max number of environment steps (potentially across multiple episodes).')
 
 # Flags for algorithm parameters
-tf.app.flags.DEFINE_float('alpha', 0.05, 'The learning rate (alpha) to be used.')
+tf.app.flags.DEFINE_float('learning_rate', 0.05, 'The learning rate (alpha) to be used.')
 tf.app.flags.DEFINE_float('gamma', 0.9, 'The discount factor (gamma) to be used.')
 tf.app.flags.DEFINE_float('epsilon', 1.0, 'The initial exploration factor (epsilon) to be used.')
 
@@ -46,6 +48,73 @@ replay_buffer = ReplayBuffer(FLAGS.buffer_size)
 alpha = FLAGS.alpha
 gamma = FLAGS.gamma
 epsilon = FLAGS.epsilon
+
+
+class Model(object):
+    def __init__(self, gamma, learning_rate, epsilon, env):
+        self.gamma = gamma
+        self.learning_rate = learning_rate
+        self.epsilon = epsilon
+
+        self.env = env
+        self.r = None
+        self.s = None
+        self.s_next = None
+        self.a = None
+        self.is_terminal = None
+
+        self.update_q_target = None
+
+        self.q_action = None
+        self.q_target = None
+        self.greedy_action = None
+        self.action = None
+
+    def create(self):
+        global_step = tf.train.get_or_create_global_step()
+
+        self.r = tf.placeholder(name="reward", dtype=tf.float32, )
+        self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, len(self.env.current_state)))
+        self.s_next = tf.placeholder(name='state_next', dtype=tf.float32, shape=(None, len(self.env.current_state)))
+        self.a = tf.placeholder(name='action', dtype=tf.int64)
+        self.is_terminal = tf.placeholder(name='is_terminal', dtype=tf.float32)
+
+        self.q_action = DeepNN(name='Q_action',
+                               inputs=self.s,
+                               hidden_layer_sizes=FLAGS.dqn_layer_sizes,
+                               n_actions=self.env.action_space.n)
+
+        # TODO: Need a copy of Q_action with trainable=False
+        self.q_target = DeepNN(name='Q_target',
+                               inputs=self.s_next,
+                               hidden_layer_sizes=FLAGS.dqn_layer_sizes,
+                               n_actions=self.env.action_space.n,
+                               trainable=False)
+
+        # Determine next action using an epsilon greedy policy based on Q(S,A)
+        self.greedy_action = tf.argmax(self.q_action.action_values, axis=-1)
+
+        self.action = tf.cond(tf.less(tf.random_uniform(shape=[]), self.epsilon), lambda: self.greedy_action,
+                              lambda: tf.random_uniform(maxval=self.env.action_space.n, dtype=tf.int64))
+
+        self.td_target = self.r + self.gamma * tf.maximum(self.q_target.action_values, axis=-1) * (1 - self.is_terminal)
+        self.predicted_q = self.q_action.action_values[:, self.a]
+        self.loss = tf.losses.mean_squared_error(labels=self.td_target, predictions=self.predicted_q)
+
+        # TODO: Create the training op
+        # Build a Graph that trains the model with one batch of examples and
+        # updates the model parameters.
+        # train_op = cifar10.train(loss, global_step)\
+        self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train = self.optimizer.minimize(self.loss)
+
+        # TODO: Create a copy operation for Q_action to Q_target
+        copy_vars_ops = []
+
+        for src, dest in zip(self.q_action.variables, self.q_target.variables):
+            copy_vars_ops.append(tf.assign(dest, src))
+
+        self.update_q_target = tf.group(copy_vars_ops, name='update_q_target')
 
 
 def calculate_loss(mini_batch, Q_target, Q_action):
@@ -70,40 +139,24 @@ def train(env):
     """Train for a number of steps."""
     with tf.Graph().as_default():
         # Integer (Variable) that counts the number of examples that have been used up to this point in training
-        global_step = tf.train.get_or_create_global_step()
+
         # inc_global_step = tf.assign(global_step, global_step + 1)
 
         # Constants
-        gamma = tf.constant(FLAGS.gamma, tf.float32)
+
 
         # Variables
-        alpha = tf.Variable(initial_value=FLAGS.alpha, dtype=tf.float32)
+
 
         # TODO: Create computational graph
-        r = tf.placeholder(dtype=tf.float32, name="reward")
-        s = tf.placeholder(name='s', dtype=tf.float32, shape=(None, len(env.current_state)))
 
-        Q_action = DeepNN(name='Q_action',
-                          inputs=s,
-                          hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                          n_actions=env.action_space.n)
 
-        # TODO: Need a copy of Q_action with trainable=False
-        Q_target = DeepNN(name='Q_target',
-                          inputs=s,
-                          hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                          n_actions=env.action_space.n)
+
 
         # TODO: Define loss operation
-        loss = tf.constant(0)
 
-        # TODO: Create the training op
-        # Build a Graph that trains the model with one batch of examples and
-        # updates the model parameters.
-        # train_op = cifar10.train(loss, global_step)
 
-        # TODO: Create a copy operation for Q_action to Q_target
-        # copy_network_op = ...
+
 
 
         class _LoggerHook(tf.train.SessionRunHook):
@@ -161,6 +214,9 @@ def train(env):
                 global_step_value = mon_sess.run(global_step)
 
                 # Determine next action using an epsilon greedy policy based on Q(S,A)
+                env.current_state
+
+                np.argmax(Q([], session=session)) if random() <= epsilon else env.action_space.sample()
                 action = eps_greedy(env=env, Q=Q_action, epsilon=epsilon, session=mon_sess)
 
                 # Execute action against environment and observe transition

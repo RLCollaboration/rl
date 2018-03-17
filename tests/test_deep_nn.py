@@ -10,27 +10,25 @@ from random import random
 test_scenario = namedtuple('scenario', ['name', 'inputs', 'layer_sizes', 'n_actions', 'trainable'])
 
 
-class TestDeepNN(unittest.TestCase):
+class TestDeepNN(tf.test.TestCase):
     def test_create_dnn(self):
         # Check single input, single hidden layer unit, single output
-        with tf.Graph().as_default():
-            scenario = test_scenario(name='NN1',
-                                     inputs=tf.placeholder(name='s', dtype=tf.float32, shape=(None, 1)),
-                                     layer_sizes=[1],
-                                     n_actions=1,
-                                     trainable=True)
+        scenario = test_scenario(name='NN1',
+                                 inputs=tf.placeholder(name='s', dtype=tf.float32, shape=(None, 1)),
+                                 layer_sizes=[1],
+                                 n_actions=1,
+                                 trainable=True)
 
-            self._execute_test_scenario(scenario)
+        self._execute_test_scenario(scenario)
 
         # Check multiple inputs, deep/wide network, multiple outputs
-        with tf.Graph().as_default():
-            scenario = test_scenario(name='NN2',
-                                     inputs=tf.placeholder(name='s', dtype=tf.float32, shape=(None, 1000)),
-                                     layer_sizes=[500, 250, 175, 100, 50],
-                                     n_actions=25,
-                                     trainable=True)
+        scenario = test_scenario(name='NN2',
+                                 inputs=tf.placeholder(name='s', dtype=tf.float32, shape=(None, 1000)),
+                                 layer_sizes=[500, 250, 175, 100, 50],
+                                 n_actions=25,
+                                 trainable=True)
 
-            self._execute_test_scenario(scenario)
+        self._execute_test_scenario(scenario)
 
     def _execute_test_scenario(self, scenario):
         dnn = DeepNN(name=scenario.name,
@@ -71,7 +69,7 @@ class TestDeepNN(unittest.TestCase):
         # Check forward pass
         init = tf.global_variables_initializer()
 
-        with tf.Session() as sess:
+        with self.test_session() as sess:
             sess.run(init)
 
             # Single state input
