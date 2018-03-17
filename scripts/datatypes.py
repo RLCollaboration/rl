@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from random import random, sample
 
@@ -52,16 +53,18 @@ class DeepNN(object):
             return output, w, b
 
     def __call__(self, *args, **kwargs):
-        sess = tf.get_default_session()
-        return sess.run([self.action_values], feed_dict={self.inputs: args[0]})
+        states = list(args[0]) if isinstance(args[0], list) else args[0]
+        sess = kwargs['session'] \
+            if 'session' in kwargs and kwargs['session'] is not None \
+            else tf.get_default_session()
+        return sess.run([self.action_values], feed_dict={self.inputs: states})
 
 
 class ReplayBuffer(object):
-    def __init__(self, initial_size=0, max_size=100):
-        self.initial_size = initial_size
+    def __init__(self, max_size=100):
         self.max_size = max_size
 
-        self._elements = [None] * self.initial_size
+        self._elements = []
         self._last_ndx = -1
 
     def __len__(self):
@@ -81,4 +84,4 @@ class ReplayBuffer(object):
         return self._elements.count(obj)
 
     def sample(self, size):
-        return [self._elements[i] for i in sample(xrange(len(self)), size)]
+        return sample(self._elements, size)

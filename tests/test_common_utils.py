@@ -4,6 +4,10 @@ from mock import patch
 from common_utils import eps_greedy
 
 import numpy as np
+import tensorflow as tf
+
+from datatypes import DeepNN
+from env_utils import EnvWrapper
 
 
 class FakeDNN(object):
@@ -46,6 +50,29 @@ class MyTestCase(unittest.TestCase):
             env = FakeEnv()
             self.assertEqual(eps_greedy(env=env, epsilon=0.9, Q=Q), 17)
 
+    def test_with_tensorflow_and_real_env(self):
+
+        try:
+
+            env = EnvWrapper(name='CartPole-v0')
+
+            g = tf.Graph()
+            with g.as_default():
+                s = tf.placeholder(shape=(None, len(env.current_state)), dtype=tf.float32)
+                Q = DeepNN(name='Q_target',
+                           inputs=s,
+                           hidden_layer_sizes=[10, 5],
+                           n_actions=env.action_space.n)
+                init = tf.global_variables_initializer()
+
+            with tf.Session(graph=g) as sess:
+                sess.run(init)
+
+                # Force greedy policy to guarantee Q is evaluated
+                eps_greedy(Q=Q, env=env, epsilon=1.0)
+
+        except Exception as e:
+            self.fail(e.message)
 
 
 if __name__ == '__main__':

@@ -1,4 +1,6 @@
 import unittest
+
+from timeit import timeit
 from datatypes import ReplayBuffer
 
 
@@ -48,7 +50,6 @@ class TestReplayBuffer(unittest.TestCase):
             b.append(n)
             self.assertEqual(b.count(n - 10), 0, msg="{} should have been removed from buffer".format(n - 10))
 
-
     def test_random_sample(self):
         b = ReplayBuffer(max_size=100)
 
@@ -67,3 +68,21 @@ class TestReplayBuffer(unittest.TestCase):
         # Verify all elements of sample appear in original buffer
         for n in sample:
             self.assertTrue(b.count(n) > 0)
+
+    def test_timing(self):
+
+        BUFFER_SIZE = 1024
+        SAMPLE_SIZE = 64
+        NUM_TRIALS = 10000
+
+        b = ReplayBuffer(max_size=BUFFER_SIZE)
+        for n in xrange(BUFFER_SIZE):
+            b.append(n)
+
+        def f():
+            return b.sample(size=SAMPLE_SIZE)
+
+        actual_avg_time = timeit(f, number=NUM_TRIALS) / NUM_TRIALS
+        max_avg_time = 0.00005  # TODO: Adjust as needed
+
+        self.assertLess(actual_avg_time, max_avg_time)
