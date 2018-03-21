@@ -57,24 +57,40 @@ class ReplayBuffer(object):
     def __init__(self, max_size=100):
         self.max_size = max_size
 
-        self._elements = []
+        self._states = np.zeros(self.max_size)
+        self._actions = np.zeros(self.max_size)
+        self._rewards = np.zeros(self.max_size)
+        self._next_states = np.zeros(self.max_size)
+        self._is_terminal_states = np.zeros(self.max_size)
+
         self._last_ndx = -1
+        self._size = 0
 
     def __len__(self):
-        return len(self._elements)
+        return self._size
 
     def full(self):
         return len(self) == self.max_size
 
-    def append(self, obj):
+    def append(self, trans):
         self._last_ndx = (self._last_ndx + 1) % self.max_size
+
         if len(self) < self.max_size:
-            self._elements.append(obj)
-        else:
-            self._elements[self._last_ndx] = obj
+            self._size += 1
 
-    def count(self, obj):
-        return self._elements.count(obj)
+        self._states[self._last_ndx] = trans.state
+        self._actions[self._last_ndx] = trans.action
+        self._rewards[self._last_ndx] = trans.reward
+        self._next_states[self._last_ndx] = trans.next_state
+        self._is_terminal_states[self._last_ndx] = 1.0 if trans.is_terminal else 0.0
 
-    def sample(self, size):
-        return sample(self._elements, size)
+    def __getitem__(self, indexes):
+        return self._states[indexes], \
+               self._actions[indexes], \
+               self._rewards[indexes], \
+               self._next_states[indexes], \
+               self._is_terminal_states[indexes]
+
+    def sample(self, sample_size):
+        indexes = np.random.choice(np.arange(self._size), size=sample_size, replace=False)
+        return self[indexes]
