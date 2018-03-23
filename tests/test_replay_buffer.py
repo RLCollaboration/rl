@@ -2,7 +2,7 @@ import unittest
 
 from timeit import timeit
 from datatypes import ReplayBuffer
-from env_utils import env_transition
+from env_utils import Transition
 
 
 class TestReplayBuffer(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestReplayBuffer(unittest.TestCase):
         # Test length is correct
         length = 0
         for n in xrange(MAX_SIZE):
-            b.append(env_transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
+            b.append(Transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
             length += 1
             self.assertEqual(len(b), length)
 
@@ -36,8 +36,8 @@ class TestReplayBuffer(unittest.TestCase):
                 self.assertTrue(b.full())
 
         # test max size constraint (size does not change when appending to buffer at max size)
-        b.append(env_transition(state=length + 1, action=length + 1, next_state=length + 1, reward=length + 1,
-                                is_terminal=False))
+        b.append(Transition(state=length + 1, action=length + 1, next_state=length + 1, reward=length + 1,
+                            is_terminal=False))
         self.assertEqual(len(b), MAX_SIZE)
 
         # test that when adding another element at buffer max capacity preserves full-ness
@@ -45,12 +45,12 @@ class TestReplayBuffer(unittest.TestCase):
 
         # test is_terminal adds 0.0 when False and 1.0 when True
         b = ReplayBuffer(max_size=10)
-        b.append(env_transition(state=1, action=1, next_state=1, reward=1, is_terminal=False))
+        b.append(Transition(state=1, action=1, next_state=1, reward=1, is_terminal=False))
         s, a, n, r, is_terminal = b[0]
         self.assertEqual(is_terminal, 0.0)
 
         b = ReplayBuffer(max_size=10)
-        b.append(env_transition(state=1, action=1, next_state=1, reward=1, is_terminal=True))
+        b.append(Transition(state=1, action=1, next_state=1, reward=1, is_terminal=True))
         s, a, n, r, is_terminal = b[0]
         self.assertEqual(is_terminal, 1.0)
 
@@ -58,7 +58,7 @@ class TestReplayBuffer(unittest.TestCase):
         MAX_SIZE = 100
         b = ReplayBuffer(max_size=MAX_SIZE)
         for n in xrange(MAX_SIZE):
-            b.append(env_transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
+            b.append(Transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
 
         # Test single index to __get_item__
         for index in xrange(MAX_SIZE):
@@ -92,7 +92,7 @@ class TestReplayBuffer(unittest.TestCase):
 
         # Fill buffer
         for n in xrange(100):
-            b.append(env_transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
+            b.append(Transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
 
         # Verify sample size
         s, a, n, r, t = b.sample(sample_size=10)
@@ -111,7 +111,7 @@ class TestReplayBuffer(unittest.TestCase):
 
         b = ReplayBuffer(max_size=BUFFER_SIZE)
         for n in xrange(BUFFER_SIZE):
-            b.append(env_transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
+            b.append(Transition(state=n, action=n, next_state=n, reward=n, is_terminal=False))
 
         def f():
             return b.sample(sample_size=SAMPLE_SIZE)
