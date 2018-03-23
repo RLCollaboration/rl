@@ -2,16 +2,9 @@
 """A Tensorflow version of DQN (see https://deepmind.com/research/dqn/)
 """
 import tensorflow as tf
-import numpy as np
-import time
 
-from datetime import datetime
-
-from matplotlib.mlab import cohere_pairs
-
-from common_utils import eps_greedy
-from env_utils import EnvWrapper
 from datatypes import ReplayBuffer, DeepNN
+from env_utils import EnvWrapper
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -37,17 +30,11 @@ tf.app.flags.DEFINE_float('gamma', 0.9, 'The discount factor (gamma) to be used.
 tf.app.flags.DEFINE_float('epsilon', 1.0, 'The initial exploration factor (epsilon) to be used.')
 
 tf.app.flags.DEFINE_integer('buffer_size', 1000, 'Maximum replay buffer size.')
-tf.app.flags.DEFINE_integer('mini_batch_size', 64, 'Size of minibatches sampled from replay buffer.')
+tf.app.flags.DEFINE_integer('batch_size', 64, 'Batch size sampled from replay buffer.')
 
 tf.app.flags.DEFINE_integer('train_q_freq', 50, 'The number of steps before updating the action Q network.')
 tf.app.flags.DEFINE_integer('target_q_update_freq', 100,
                             'The number of steps before updating target Q network from action Q network.')
-
-# Shared variables
-replay_buffer = ReplayBuffer(FLAGS.buffer_size)
-alpha = FLAGS.alpha
-gamma = FLAGS.gamma
-epsilon = FLAGS.epsilon
 
 
 class Model(object):
@@ -55,65 +42,55 @@ class Model(object):
     self.gamma = gamma
     self.learning_rate = learning_rate
     self.epsilon = epsilon
-
     self.env = env
-    self.r = None
-    self.s = None
-    self.s_next = None
-    self.a = None
-    self.is_terminal = None
 
-    self.update_q_target = None
-
-    self.q_action = None
-    self.q_target = None
-    self.greedy_action = None
-    self.action = None
-
-    self.global_step = None
-    self.action_step = None
-    self.inc_action_step = None
-
-  def create(self):
+    # Create computational graph
     self.global_step = tf.train.get_or_create_global_step()
     tf.summary.scalar("global_step", self.global_step)
+
     self.action_step = tf.get_variable("action_step", [], dtype=tf.int64)
     tf.summary.scalar("action_step", self.action_step)
 
-
-    self.r = tf.placeholder(name="reward", dtype=tf.float32, )
     self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, len(self.env.current_state)))
-    self.s_next = tf.placeholder(name='state_next', dtype=tf.float32, shape=(None, len(self.env.current_state)))
-    self.a = tf.placeholder(name='action', dtype=tf.int64)
-    self.is_terminal = tf.placeholder(name='is_terminal', dtype=tf.float32)
+    self.a = tf.placeholder(name='action', dtype=tf.int32)
+    self.r = tf.placeholder(name="reward", dtype=tf.float32, )
+    self.n = tf.placeholder(name='next_state', dtype=tf.float32, shape=(None, len(self.env.current_state)))
+    self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
+    # Create target and action neural networks
     self.q_action = DeepNN(name='Q_action',
                            inputs=self.s,
                            hidden_layer_sizes=FLAGS.dqn_layer_sizes,
                            n_actions=self.env.action_space.n)
 
     self.q_target = DeepNN(name='Q_target',
-                           inputs=self.s_next,
+                           inputs=self.n,
                            hidden_layer_sizes=FLAGS.dqn_layer_sizes,
                            n_actions=self.env.action_space.n,
                            trainable=False)
 
-    # Determine next action using an epsilon greedy policy based on Q(S,A)
-    self.greedy_action = tf.argmax(self.q_action.action_values, axis=-1)
+    # Epsilon greedy policy operation
+    self._greedy_action = tf.argmax(self.q_action.action_values, axis=-1)
+    self._random_action = tf.random_uniform(dtype=tf.int64, shape=[], maxval=self.env.action_space.n)
 
+    # Greedy action if random n < epsilon, else random action
     self.inc_action_step = tf.assign_add(self.action_step, 1)
     with tf.control_dependencies([self.inc_action_step]):
-      self.action = tf.cond(tf.less(tf.random_uniform(shape=[]), self.epsilon), lambda: self.greedy_action,
-                            lambda: tf.random_uniform(maxval=self.env.action_space.n, dtype=tf.int64))
+      self.action = tf.cond(tf.less(tf.random_uniform(dtype=tf.float32, shape=[]), self.epsilon),
+                            lambda: self._greedy_action,
+                            lambda: self._random_action)
 
-    # Calculate Loss
-    self.td_target = self.r + self.gamma * tf.maximum(self.q_target.action_values, axis=-1) * (1 - self.is_terminal)
+    # Loss operation
+    self.td_target = self.r + \
+                     self.gamma * tf.reduce_max(self.q_target.action_values, axis=-1) * (1 - self.t)
+
     self.predicted_q = self.q_action.action_values[:, self.a]
     self.loss = tf.losses.mean_squared_error(labels=self.td_target, predictions=self.predicted_q)
     tf.summary.scalar("loss", self.loss)
 
+    # Training operation
     self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
-    self.train = self.optimizer.minimize(self.loss)
+    self.train = self.optimizer.minimize(loss=self.loss, global_step=self.global_step)
 
     # Create a copy operation for Q_action to Q_target
     copy_vars_ops = []
@@ -128,9 +105,9 @@ def train(env):
   """Train for a number of steps."""
 
   model = Model(FLAGS.gamma, FLAGS.learning_rate, FLAGS.epsilon, env)
-  model.create()
-  # Utility class that creates the tf session for you plus add on functionality
-  # -- Different flavors of this exist
+  replay_buffer = ReplayBuffer(state_dim=len(env.current_state),
+                               max_size=FLAGS.buffer_size)
+
   with tf.train.SingularMonitoredSession(
       # save/load model state
       checkpoint_dir=FLAGS.train_dir,
@@ -149,25 +126,27 @@ def train(env):
         log_device_placement=FLAGS.log_device_placement)) as mon_sess:
 
     while not mon_sess.should_stop():
-      # Execute action against environment and observe transition
-      action, action_step = mon_sess.raw_session().run([model.action, model.action_step])
-      transition = env.step(action)
+      action, action_step = mon_sess.raw_session().run([model.action, model.action_step],
+                                                       feed_dict={model.s: [model.env.current_state]})
+      transition = env.step(action[0])
 
       replay_buffer.append(transition)
 
       if replay_buffer.full():
         if action_step % FLAGS.target_q_update_freq == 0:
-          mon_sess.raw_session.run(model.update_q_target)
+          mon_sess.raw_session().run(model.update_q_target)
 
         if action_step % FLAGS.train_q_freq == 0:
-          # TODO: Sample minibatch from the replay buffer
-          mini_batch = replay_buffer.sample(FLAGS.mini_batch_size)
-          # TODO: Update input Dic
-          _,loss, global_step = mon_sess.run([model.train_op, model.loss, model.global_step],
-                                             {model.r: mini_batch})
+          batch = replay_buffer.sample(FLAGS.batch_size)
+          _, loss, global_step = mon_sess.run([model.train, model.loss, model.global_step],
+                                              {model.s: batch.states,
+                                               model.a: batch.actions,
+                                               model.r: batch.rewards,
+                                               model.n: batch.next_states,
+                                               model.t: batch.is_terminal_indicators})
 
 
-def main(argv=None):  # pylint: disable=unused-argument
+def main(argv=None):
   if not tf.gfile.Exists(FLAGS.train_dir):
     tf.gfile.MakeDirs(FLAGS.train_dir)
 
