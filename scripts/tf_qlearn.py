@@ -85,15 +85,11 @@ class Model(object):
                      self.gamma * tf.reduce_max(self.q_target.action_values, axis=-1) * (1 - self.t)
 
     # Remove after debugging
-    v = tf.Print(self.q_action.action_values, [tf.shape(self.a), tf.shape(self.q_action.action_values)], message='Action values: ')
-
     mask = tf.one_hot(self.a, depth=self.env.action_space.n, dtype=tf.bool, on_value=True, off_value=False)
     mask = tf.reshape(mask, shape=[-1,self.env.action_space.n])
     self.predicted_q = tf.boolean_mask(self.q_action.action_values, mask)
 
-    v2 = tf.Print(self.predicted_q, [tf.shape(self.td_target), tf.shape(self.predicted_q)], message='Shapes of td_target and predicted_q: ')
-
-    self.loss = tf.losses.mean_squared_error(labels=self.td_target, predictions=v2)
+    self.loss = tf.losses.mean_squared_error(labels=self.td_target, predictions=self.predicted_q)
     tf.summary.scalar("loss", self.loss)
 
     # Training operation
