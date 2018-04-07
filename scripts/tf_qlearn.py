@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-"""A Tensorflow version of DQN (see https://deepmind.com/research/dqn/)
+"""A Tensorflow version of DQN (see https://deepmind.com/research/dqn/) that uses OpenAI gym environments.
 """
 import tensorflow as tf
 
@@ -16,14 +16,15 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False, 'Whether to log devic
 tf.app.flags.DEFINE_integer('log_frequency', 10, 'How often to log results to the console.')
 
 # Flags for creation of computational graph
-tf.app.flags.DEFINE_list('dqn_layer_sizes', [25, 10], 'Layer sizes for the dqn.')
+tf.app.flags.DEFINE_list('dqn_layer_sizes', [250, 100], 'Layer sizes for the dqn.')
 
 # Flags for environment handling
-tf.app.flags.DEFINE_string('environment', 'CartPole-v1', 'The name of the openai gym environment to use')
+tf.app.flags.DEFINE_string('environment', 'MountainCar-v0', 'The name of the openai gym environment to use')
 tf.app.flags.DEFINE_boolean('render', True, 'Whether to render a display of the environment state.')
 
 # Flags for termination criteria
-tf.app.flags.DEFINE_integer('steps', 1000000, 'Max number of environment steps (potentially across multiple episodes).')
+# TODO: Current behavior is to stop after this many training steps, not environment steps.
+tf.app.flags.DEFINE_integer('steps', 100000, 'Max number of environment steps (potentially across multiple episodes).')
 
 # Flags for algorithm parameters
 tf.app.flags.DEFINE_float('learning_rate', 0.05, 'The learning rate (alpha) to be used.')
@@ -61,12 +62,12 @@ class Model(object):
     self.q_action = DeepNN(name='Q_action',
                            inputs=self.s,
                            hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                           n_actions=env.action_space.n)
+                           n_actions=env.n_actions)
 
     self.q_target = DeepNN(name='Q_target',
                            inputs=self.n,
                            hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                           n_actions=env.action_space.n,
+                           n_actions=env.n_actions,
                            trainable=False)
 
     # Epsilon greedy policy operation
@@ -119,14 +120,15 @@ def train(env):
       # save/load model state
       checkpoint_dir=FLAGS.train_dir,
       hooks=[tf.train.StopAtStepHook(last_step=FLAGS.steps),
-             tf.train.NanTensorHook(model.loss), tf.train.SummarySaverHook(
-          save_steps=100,
-          save_secs=None,
-          output_dir=FLAGS.train_dir,
-          summary_writer=None,
-          scaffold=tf.train.Scaffold(summary_op=tf.summary.merge_all()),
-          summary_op=None
-        )],
+             tf.train.NanTensorHook(model.loss),
+             tf.train.SummarySaverHook(
+               save_steps=100,
+               save_secs=None,
+               output_dir=FLAGS.train_dir,
+               summary_writer=None,
+               scaffold=tf.train.Scaffold(summary_op=tf.summary.merge_all()),
+               summary_op=None
+             )],
 
       # Can be configured for multi-machine training (check out docs for this class)
       config=tf.ConfigProto(
@@ -135,6 +137,7 @@ def train(env):
     while not mon_sess.should_stop():
       action, action_step = mon_sess.raw_session().run([model.action, model.action_step],
                                                        feed_dict={model.s: [env.current_state]})
+
       transition = env.step(action)
 
       episode.append(transition)
