@@ -6,8 +6,6 @@ from gym.spaces import Discrete
 Transition = namedtuple('Transition', ['state', 'action', 'next_state', 'reward', 'is_terminal'], verbose=False)
 
 
-# TODO:
-#
 # OpenAI Gym Environment Status:
 #
 # CartPole-v1 (working)

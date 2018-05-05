@@ -4,6 +4,67 @@ import numpy as np
 import tensorflow as tf
 
 
+def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, trainable=True):
+  variables = []
+
+  with tf.variable_scope(name):
+    previous = inputs
+
+    # Create the Hidden Layers
+    for i, layer_size in enumerate(hidden_layer_sizes):
+      previous, v = create_conv_layer("Conv_{}".format(i),
+                                      previous, n_filters=layer_size,
+                                      activation=tf.nn.relu,
+                                      trainable=trainable)
+      variables += v
+
+    flattened_shape = tf.stack(tf.shape(previous)[0], [-1])
+
+    # Dense Layer
+    flattened_layer = tf.reshape(previous, flattened_shape)
+    dense, w, b = create_dense_layer("Final", inputs=flattened_layer, layer_size=n_actions, trainable=trainable)
+    variables += [w,b]
+
+    # dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=trainable)
+    return dense, variables
+
+def create_conv_layer(scope_name, inputs, n_filters, activation=None, trainable=True):
+  with tf.variable_scope(scope_name):
+    conv_layer = tf.layers.Conv2D(
+      filters=n_filters,
+      kernel_size=[5, 5],
+      padding="same",
+      activation=activation,
+      trainable=trainable)
+
+    outputs = conv_layer(inputs)
+
+    return outputs, conv_layer.variables
+
+
+def create_dense_layer(scope_name, inputs, layer_size, trainable=True, activation=None):
+  with tf.variable_scope(scope_name):
+    input_size = inputs.get_shape()[1]
+
+    w = tf.get_variable("weights",
+                        shape=(input_size, layer_size),
+                        trainable=trainable,
+                        dtype=tf.float32)
+
+    b = tf.get_variable("bias",
+                        shape=(layer_size,),
+                        initializer=tf.zeros_initializer(),
+                        trainable=trainable,
+                        dtype=tf.float32)
+
+    output = tf.matmul(inputs, w) + b
+
+    if activation:
+      output = activation(output)
+
+    return output, w, b
+
+
 class DeepNN(object):
   def __init__(self, name, inputs, hidden_layer_sizes, n_actions, trainable=True):
     self.name = name
@@ -58,14 +119,14 @@ Batch = namedtuple('Batch', ['states', 'actions', 'rewards', 'next_states', 'is_
 
 
 class ReplayBuffer(object):
-  def __init__(self, state_dim, max_size=100):
+  def __init__(self, env, max_size=100):
     self.max_size = max_size
 
-    self._states = np.zeros((self.max_size, state_dim))
-    self._actions = np.zeros(self.max_size)
-    self._rewards = np.zeros(self.max_size)
-    self._next_states = np.zeros((self.max_size, state_dim))
-    self._is_terminal_states = np.zeros(self.max_size)
+    self._states = np.zeros(shape=(max_size,) + env.current_state.shape)
+    self._actions = np.zeros(shape=(max_size,))
+    self._rewards = np.zeros(shape=(max_size,))
+    self._next_states = np.zeros(shape=(max_size,) + env.current_state.shape)
+    self._is_terminal_states = np.zeros(shape=(max_size,))
 
     self._last_ndx = -1
     self._size = 0
