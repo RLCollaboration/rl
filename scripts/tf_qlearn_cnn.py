@@ -66,12 +66,14 @@ class Model(object):
     self.q_action_action_values, self.q_action_variables = create_deep_conv_net(name='Q_action',
                                                                                 inputs=self.s,
                                                                                 hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                                                                                n_actions=env.n_actions)
+                                                                                n_actions=env.n_actions,
+                                                                                batch_size=FLAGS.batch_size)
 
     self.q_target_action_values, self.q_target_variables = create_deep_conv_net(name='Q_target',
                                                                                 inputs=self.s,
                                                                                 hidden_layer_sizes=FLAGS.dqn_layer_sizes,
                                                                                 n_actions=env.n_actions,
+                                                                                batch_size=FLAGS.batch_size,
                                                                                 trainable=False)
 
     # Epsilon greedy policy operation

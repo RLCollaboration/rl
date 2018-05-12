@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, trainable=True):
+def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, batch_size, trainable=True):
   variables = []
 
   with tf.variable_scope(name):
@@ -18,10 +18,15 @@ def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, trainable=
                                       trainable=trainable)
       variables += v
 
-    flattened_shape = tf.stack(tf.shape(previous)[0], [-1])
+    output_shape = previous.get_shape().as_list()[1:]
+    last_dim_size = 1
+    for v in output_shape:
+      last_dim_size *= v
 
-    # Dense Layer
-    flattened_layer = tf.reshape(previous, flattened_shape)
+    # flattened_shape = tf.stack(values=[batch_size, last_dim_size])
+
+    # Dense Layers
+    flattened_layer = tf.reshape(previous, [batch_size, last_dim_size])
     dense, w, b = create_dense_layer("Final", inputs=flattened_layer, layer_size=n_actions, trainable=trainable)
     variables += [w,b]
 
@@ -39,15 +44,16 @@ def create_conv_layer(scope_name, inputs, n_filters, activation=None, trainable=
 
     outputs = conv_layer(inputs)
 
+    print(outputs.get_shape().as_list())
     return outputs, conv_layer.variables
 
 
 def create_dense_layer(scope_name, inputs, layer_size, trainable=True, activation=None):
   with tf.variable_scope(scope_name):
-    input_size = inputs.get_shape()[1]
-
+    input_size = inputs.get_shape().as_list()
+    print(input_size)
     w = tf.get_variable("weights",
-                        shape=(input_size, layer_size),
+                        shape=(input_size[1], layer_size),
                         trainable=trainable,
                         dtype=tf.float32)
 
