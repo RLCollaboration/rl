@@ -3,6 +3,52 @@ from collections import namedtuple
 import numpy as np
 import tensorflow as tf
 
+def create_cnn(name, inputs, input_size, conv_filters, n_actions, trainable=True):
+
+  variables = []
+
+  """Model function for CNN."""
+  # Convolutional Layer #1
+  conv1 = tf.layers.Conv2D(
+    filters=conv_filters[0],
+    kernel_size=[5, 5],
+    padding="same",
+    activation=tf.nn.relu,
+    trainable=trainable)
+
+  variables += conv1.variables
+
+  # Pooling Layer #1
+  pool1 = tf.layers.max_pooling2d(inputs=conv1(inputs), pool_size=[4, 4], strides=4)
+
+  # # Convolutional Layer #2 and Pooling Layer #2
+  # conv2 = tf.layers.conv2d(
+  #   inputs=pool1,
+  #   filters=conv_filters[1],
+  #   kernel_size=[5, 5],
+  #   padding="same",
+  #   activation=tf.nn.relu,
+  #   trainable=trainable)
+  # pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, padding="same")
+
+  # Dense Layer
+  # pool2_flat = tf.reshape(pool1, [-1, input_size[0] * input_size[1] * conv_filters[0] / 16])
+  pool2_flat = tf.reshape(pool1, [-1, 66560])
+
+  dense = tf.layers.Dense(units=1024, activation=tf.nn.relu)
+  variables += dense.variables
+
+  dense_layer_tensor = dense(pool2_flat)
+  # dropout = tf.layers.dropout(
+  #   inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+
+  # Logits Layer
+  logits = tf.layers.Dense(units=n_actions)
+
+  return logits(dense_layer_tensor), variables
+
+
+
 
 def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, batch_size, trainable=True):
   variables = []

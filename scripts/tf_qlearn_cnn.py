@@ -3,7 +3,7 @@
 """
 import tensorflow as tf
 
-from datatypes import ReplayBuffer, create_deep_conv_net
+from datatypes import ReplayBuffer, create_cnn
 from env_utils import EnvWrapper
 from rl_utils import calc_return
 
@@ -27,7 +27,7 @@ tf.app.flags.DEFINE_boolean('render', True, 'Whether to render a display of the 
 tf.app.flags.DEFINE_integer('steps', 100000, 'Max number of environment steps (potentially across multiple episodes).')
 
 # Flags for algorithm parameters
-tf.app.flags.DEFINE_float('learning_rate', 0.05, 'The learning rate (alpha) to be used.')
+tf.app.flags.DEFINE_float('learning_rate', 0.0001, 'The learning rate (alpha) to be used.')
 tf.app.flags.DEFINE_float('gamma', 1.0, 'The discount factor (gamma) to be used.')
 tf.app.flags.DEFINE_float('epsilon', 1.0, 'The initial exploration rate (epsilon) to be used.')
 tf.app.flags.DEFINE_float('epsilon_decay_rate', 0.0001, 'The exponential rate of decay for the exploration rate.')
@@ -63,18 +63,18 @@ class Model(object):
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
     # TODO: Create target and action convolutional neural networks
-    self.q_action_action_values, self.q_action_variables = create_deep_conv_net(name='Q_action',
-                                                                                inputs=self.s,
-                                                                                hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                                                                                n_actions=env.n_actions,
-                                                                                batch_size=FLAGS.batch_size)
+    self.q_action_action_values, self.q_action_variables = create_cnn(name='Q_action',
+                                                                      inputs=self.s,
+                                                                      input_size=[210, 160],
+                                                                      conv_filters=[32],
+                                                                      n_actions=env.n_actions)
 
-    self.q_target_action_values, self.q_target_variables = create_deep_conv_net(name='Q_target',
-                                                                                inputs=self.s,
-                                                                                hidden_layer_sizes=FLAGS.dqn_layer_sizes,
-                                                                                n_actions=env.n_actions,
-                                                                                batch_size=FLAGS.batch_size,
-                                                                                trainable=False)
+    self.q_target_action_values, self.q_target_variables = create_cnn(name='Q_target',
+                                                                      inputs=self.s,
+                                                                      input_size=[210, 160],
+                                                                      conv_filters=[32],
+                                                                      n_actions=env.n_actions,
+                                                                      trainable=False)
 
     # Epsilon greedy policy operation
     self._greedy_action = tf.argmax(self.q_action_action_values, axis=-1)
@@ -103,8 +103,16 @@ class Model(object):
     tf.summary.scalar("loss", self.loss)
 
     # Training operation
+    # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate)
     self.optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    self.train = self.optimizer.minimize(loss=self.loss, global_step=self.global_step)
+    # self.train = self.optimizer.minimize(loss=self.loss, global_step=self.global_step)
+
+    grads_and_vars = self.optimizer.compute_gradients(loss=self.loss)
+    clipped_grads_and_vars = [(tf.clip_by_norm(t=grad, clip_norm=5), var)
+                              if grad is not None else (grad, var)
+                              for grad, var in grads_and_vars]
+
+    self.train = self.optimizer.apply_gradients(grads_and_vars=clipped_grads_and_vars, global_step=self.global_step)
 
     # Create a copy operation for Q_action to Q_target
     copy_vars_ops = []
@@ -163,6 +171,7 @@ def train(env):
           mon_sess.raw_session().run(model.update_q_target)
 
         if action_step % FLAGS.train_q_freq == 0:
+          print('training')
           batch = replay_buffer.sample(FLAGS.batch_size)
           _, loss, global_step = mon_sess.run([model.train, model.loss, model.global_step],
                                               {model.s: batch.states,
@@ -170,6 +179,8 @@ def train(env):
                                                model.r: batch.rewards,
                                                model.n: batch.next_states,
                                                model.t: batch.is_terminal_indicators})
+
+          print('loss: {}, global step: {}'.format(loss, global_step))
 
 
 def main(argv=None):
