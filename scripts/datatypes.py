@@ -3,10 +3,15 @@ from collections import namedtuple
 import numpy as np
 import tensorflow as tf
 
-def create_cnn(name, inputs, input_size, conv_filters, n_actions, trainable=True):
+def create_cnn(name, inputs, input_size, conv_filters, max_pool_layer_strides, n_actions, trainable=True):
 
   variables = []
 
+  # TODO: Need to create as loop over conv + pool layers
+  # Need to correct the final output layer size calculation to include
+  # all of the pooling layer changes
+
+  # TODO: Need ability to have multiple conv layers per pooling
   """Model function for CNN."""
   # Convolutional Layer #1
   conv1 = tf.layers.Conv2D(
@@ -18,8 +23,13 @@ def create_cnn(name, inputs, input_size, conv_filters, n_actions, trainable=True
 
   variables += conv1.variables
 
+  # CNN output size: (160 - 5 + 4) + 1
+  # CNN output size: (210 - 5 + 4) + 1
+
   # Pooling Layer #1
   pool1 = tf.layers.max_pooling2d(inputs=conv1(inputs), pool_size=[4, 4], strides=4)
+
+  output_size = int(input_size[0] / pool_stride_size) * int(input_size[1] / pool_stride_size) * n_filters
 
   # # Convolutional Layer #2 and Pooling Layer #2
   # conv2 = tf.layers.conv2d(
@@ -31,9 +41,14 @@ def create_cnn(name, inputs, input_size, conv_filters, n_actions, trainable=True
   #   trainable=trainable)
   # pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, padding="same")
 
+  # 210 x 160 pixels from pong
+  #
+
   # Dense Layer
   # pool2_flat = tf.reshape(pool1, [-1, input_size[0] * input_size[1] * conv_filters[0] / 16])
-  pool2_flat = tf.reshape(pool1, [-1, 66560])
+
+  # 40 x 52 x 32
+  pool2_flat = tf.reshape(pool1, [-1, output_size])
 
   dense = tf.layers.Dense(units=1024, activation=tf.nn.relu)
   variables += dense.variables
