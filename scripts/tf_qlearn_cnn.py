@@ -3,7 +3,7 @@
 """
 import tensorflow as tf
 
-from datatypes import ReplayBuffer, create_cnn
+from datatypes import ReplayBuffer, create_cnn, ConvLayer
 from env_utils import EnvWrapper
 from rl_utils import calc_return
 
@@ -40,8 +40,12 @@ tf.app.flags.DEFINE_integer('target_q_update_freq', 100,
                             'The number of steps before updating target Q network from action Q network.')
 
 
+# TODO:  Need to figure out how to get the dimensions (for example, self.input_sizes[0] x self.input_sizes[1]) from the environment
+# and declare a single variable for it rather than the hard coded literals
 class Model(object):
   def __init__(self, learning_rate, gamma, epsilon, epsilon_decay, env):
+    self.input_sizes = (210, 160)
+
     self.global_step = tf.train.get_or_create_global_step()
     tf.summary.scalar("global_step", self.global_step)
 
@@ -51,28 +55,34 @@ class Model(object):
     self.epsilon = epsilon * tf.exp(-epsilon_decay * tf.cast(self.action_step, dtype=tf.float32))
     tf.summary.scalar("epsilon", self.epsilon)
 
-    # TODO:  Need to average over the 3 channels - New shape will be (None, 210, 160)
+    # TODO:  Need to average over the 3 channels - New shape will be (None, self.input_sizes[0], self.input_sizes[1])
     # Need to make sure this is consistent with what is defined in the replay buffer
-    self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, 210, 160, 3))
+    self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, self.input_sizes[0], self.input_sizes[1], 3))
     self.a = tf.placeholder(name='action', dtype=tf.int32)
     self.r = tf.placeholder(name="reward", dtype=tf.float32, )
 
-    # TODO:  Need to average over the 3 channels - New shape will be (None, 210, 160)
+    # TODO:  Need to average over the 3 channels - New shape will be (None, self.input_sizes[0], self.input_sizes[1])
     # Need to make sure this is consistent with what is defined in the replay buffer
-    self.n = tf.placeholder(name='next_state', dtype=tf.float32, shape=(None, 210, 160, 3))
+    self.n = tf.placeholder(name='next_state', dtype=tf.float32,
+                            shape=(None, self.input_sizes[0], self.input_sizes[1], 3))
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
+
+    layers = [ConvLayer(size=4)]
+
+    # layers = [ConvLayer(size=32),
+    #           ConvLayer(size=4, type='tf.layers.max_pooling2d', strides=(4, 4))]
 
     # TODO: Create target and action convolutional neural networks
     self.q_action_action_values, self.q_action_variables = create_cnn(name='Q_action',
                                                                       inputs=self.s,
-                                                                      input_size=[210, 160],
-                                                                      conv_filters=[32],
+                                                                      input_sizes=self.input_sizes,
+                                                                      layers=layers,
                                                                       n_actions=env.n_actions)
 
     self.q_target_action_values, self.q_target_variables = create_cnn(name='Q_target',
                                                                       inputs=self.s,
-                                                                      input_size=[210, 160],
-                                                                      conv_filters=[32],
+                                                                      input_sizes=self.input_sizes,
+                                                                      layers=layers,
                                                                       n_actions=env.n_actions,
                                                                       trainable=False)
 

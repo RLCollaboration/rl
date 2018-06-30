@@ -1,68 +1,67 @@
-from collections import namedtuple
-
 import numpy as np
 import tensorflow as tf
 
-def create_cnn(name, inputs, input_size, conv_filters, max_pool_layer_strides, n_actions, trainable=True):
+from collections import namedtuple
 
+
+class ConvLayer:
+  def __init__(self, size, type='tf.layers.Conv2D', strides=(1, 1), padding='same', activation=tf.nn.relu):
+    self.size = size
+    self.type = type
+    self.strides = strides
+    self.padding = padding
+    self.activation = activation
+
+
+# def create_cnn(name, inputs, input_size, conv_filters, max_pool_layer_strides, n_actions, trainable=True):
+
+def create_cnn(name, inputs, input_sizes, layers, n_actions, trainable=True):
   variables = []
 
-  # TODO: Need to create as loop over conv + pool layers
-  # Need to correct the final output layer size calculation to include
-  # all of the pooling layer changes
+  output = inputs
+  output_sizes = input_sizes
 
-  # TODO: Need ability to have multiple conv layers per pooling
-  """Model function for CNN."""
-  # Convolutional Layer #1
-  conv1 = tf.layers.Conv2D(
-    filters=conv_filters[0],
-    kernel_size=[5, 5],
-    padding="same",
-    activation=tf.nn.relu,
-    trainable=trainable)
+  last_conv_size = 0
 
-  variables += conv1.variables
+  for layer in layers:
 
-  # CNN output size: (160 - 5 + 4) + 1
-  # CNN output size: (210 - 5 + 4) + 1
+    if layer.type == 'tf.layers.Conv2D':
 
-  # Pooling Layer #1
-  pool1 = tf.layers.max_pooling2d(inputs=conv1(inputs), pool_size=[4, 4], strides=4)
+      conv_layer = tf.layers.Conv2D(
+        filters=layer.size,
+        kernel_size=[5, 5],
+        padding=layer.padding,
+        activation=layer.activation,
+        trainable=trainable)
 
-  output_size = int(input_size[0] / pool_stride_size) * int(input_size[1] / pool_stride_size) * n_filters
+      output = conv_layer(output)
+      variables += conv_layer.variables
+      last_conv_size = layer.size
 
-  # # Convolutional Layer #2 and Pooling Layer #2
-  # conv2 = tf.layers.conv2d(
-  #   inputs=pool1,
-  #   filters=conv_filters[1],
-  #   kernel_size=[5, 5],
-  #   padding="same",
-  #   activation=tf.nn.relu,
-  #   trainable=trainable)
-  # pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, padding="same")
+    elif layer.type == 'tf.layers.max_pooling2d':
 
-  # 210 x 160 pixels from pong
-  #
+      output = tf.layers.max_pooling2d(inputs=output, pool_size=layer.size, strides=layer.strides)
+      output_sizes = [int(output_sizes[0] / layer.strides[0]), int(output_sizes[1] / layer.strides[1])]
 
-  # Dense Layer
-  # pool2_flat = tf.reshape(pool1, [-1, input_size[0] * input_size[1] * conv_filters[0] / 16])
+  output_size = output_sizes[0] * output_sizes[1] * last_conv_size
 
-  # 40 x 52 x 32
-  pool2_flat = tf.reshape(pool1, [-1, output_size])
+  flattened_output = tf.reshape(output, [-1, output_size])
 
   dense = tf.layers.Dense(units=1024, activation=tf.nn.relu)
   variables += dense.variables
 
-  dense_layer_tensor = dense(pool2_flat)
+  output = dense(flattened_output)
+
+  # CNN output size: (160 - 5 + 4) + 1
+  # CNN output size: (210 - 5 + 4) + 1
+
   # dropout = tf.layers.dropout(
   #   inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
 
   # Logits Layer
   logits = tf.layers.Dense(units=n_actions)
 
-  return logits(dense_layer_tensor), variables
-
-
+  return logits(output), variables
 
 
 def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, batch_size, trainable=True):
@@ -89,10 +88,11 @@ def create_deep_conv_net(name, inputs, hidden_layer_sizes, n_actions, batch_size
     # Dense Layers
     flattened_layer = tf.reshape(previous, [batch_size, last_dim_size])
     dense, w, b = create_dense_layer("Final", inputs=flattened_layer, layer_size=n_actions, trainable=trainable)
-    variables += [w,b]
+    variables += [w, b]
 
     # dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=trainable)
     return dense, variables
+
 
 def create_conv_layer(scope_name, inputs, n_filters, activation=None, trainable=True):
   with tf.variable_scope(scope_name):
