@@ -68,10 +68,8 @@ class Model(object):
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
     layers = [ConvLayer(size=32),
-              ConvLayer(size=32),
               ConvLayer(size=4, type='tf.layers.max_pooling2d', strides=(4, 4))]
 
-    # TODO: Create target and action convolutional neural networks
     self.q_action_action_values, self.q_action_variables = create_cnn(name='Q_action',
                                                                       inputs=self.s,
                                                                       input_sizes=self.input_sizes,
