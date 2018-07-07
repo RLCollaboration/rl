@@ -44,7 +44,7 @@ tf.app.flags.DEFINE_integer('target_q_update_freq', 100,
 # and declare a single variable for it rather than the hard coded literals
 class Model(object):
   def __init__(self, learning_rate, gamma, epsilon, epsilon_decay, env):
-    self.input_sizes = (210, 160)
+    self.input_sizes = env.screen_dims[0:2]
 
     self.global_step = tf.train.get_or_create_global_step()
     tf.summary.scalar("global_step", self.global_step)
@@ -67,10 +67,9 @@ class Model(object):
                             shape=(None, self.input_sizes[0], self.input_sizes[1], 3))
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
-    layers = [ConvLayer(size=4)]
-
-    # layers = [ConvLayer(size=32),
-    #           ConvLayer(size=4, type='tf.layers.max_pooling2d', strides=(4, 4))]
+    layers = [ConvLayer(size=32),
+              ConvLayer(size=32),
+              ConvLayer(size=4, type='tf.layers.max_pooling2d', strides=(4, 4))]
 
     # TODO: Create target and action convolutional neural networks
     self.q_action_action_values, self.q_action_variables = create_cnn(name='Q_action',

@@ -38,6 +38,8 @@ class EnvWrapper(object):
     self.log_hook = log_hook
     self.render = render
 
+    self.screen_dims = self._env.observation_space.shape
+
     # Reset environment and choose new initial state
     self.reset()
 
