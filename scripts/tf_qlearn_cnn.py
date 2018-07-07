@@ -54,16 +54,15 @@ class Model(object):
     self.epsilon = epsilon * tf.exp(-epsilon_decay * tf.cast(self.action_step, dtype=tf.float32))
     tf.summary.scalar("epsilon", self.epsilon)
 
-    # Need to make sure this is consistent with what is defined in the replay buffer
     self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, self.input_sizes[0], self.input_sizes[1], 1))
     self.a = tf.placeholder(name='action', dtype=tf.int32)
     self.r = tf.placeholder(name="reward", dtype=tf.float32, )
-
-    # Need to make sure this is consistent with what is defined in the replay buffer
     self.n = tf.placeholder(name='next_state', dtype=tf.float32,
                             shape=(None, self.input_sizes[0], self.input_sizes[1], 1))
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
+    # Definition of CNN layer architecture
+    #     Supported layer types are 'tf.layers.Conv2D' and 'tf.layers.max_pooling2d'
     layers = [ConvLayer(size=32),
               ConvLayer(size=4, type='tf.layers.max_pooling2d', strides=(4, 4))]
 
@@ -107,9 +106,7 @@ class Model(object):
     tf.summary.scalar("loss", self.loss)
 
     # Training operation
-    # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate)
     self.optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    # self.train = self.optimizer.minimize(loss=self.loss, global_step=self.global_step)
 
     grads_and_vars = self.optimizer.compute_gradients(loss=self.loss)
     clipped_grads_and_vars = [(tf.clip_by_norm(t=grad, clip_norm=5), var)
