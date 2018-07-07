@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 """A Tensorflow version of DQN (see https://deepmind.com/research/dqn/) that uses OpenAI gym environments.
 """
+import numpy as np
 import tensorflow as tf
 
 from datatypes import ReplayBuffer, create_cnn, ConvLayer
@@ -40,8 +41,6 @@ tf.app.flags.DEFINE_integer('target_q_update_freq', 100,
                             'The number of steps before updating target Q network from action Q network.')
 
 
-# TODO:  Need to figure out how to get the dimensions (for example, self.input_sizes[0] x self.input_sizes[1]) from the environment
-# and declare a single variable for it rather than the hard coded literals
 class Model(object):
   def __init__(self, learning_rate, gamma, epsilon, epsilon_decay, env):
     self.input_sizes = env.screen_dims[0:2]
@@ -55,16 +54,14 @@ class Model(object):
     self.epsilon = epsilon * tf.exp(-epsilon_decay * tf.cast(self.action_step, dtype=tf.float32))
     tf.summary.scalar("epsilon", self.epsilon)
 
-    # TODO:  Need to average over the 3 channels - New shape will be (None, self.input_sizes[0], self.input_sizes[1])
     # Need to make sure this is consistent with what is defined in the replay buffer
-    self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, self.input_sizes[0], self.input_sizes[1], 3))
+    self.s = tf.placeholder(name='state', dtype=tf.float32, shape=(None, self.input_sizes[0], self.input_sizes[1], 1))
     self.a = tf.placeholder(name='action', dtype=tf.int32)
     self.r = tf.placeholder(name="reward", dtype=tf.float32, )
 
-    # TODO:  Need to average over the 3 channels - New shape will be (None, self.input_sizes[0], self.input_sizes[1])
     # Need to make sure this is consistent with what is defined in the replay buffer
     self.n = tf.placeholder(name='next_state', dtype=tf.float32,
-                            shape=(None, self.input_sizes[0], self.input_sizes[1], 3))
+                            shape=(None, self.input_sizes[0], self.input_sizes[1], 1))
     self.t = tf.placeholder(name='is_terminal', dtype=tf.float32)
 
     layers = [ConvLayer(size=32),
@@ -187,15 +184,14 @@ def train(env):
                                                model.n: batch.next_states,
                                                model.t: batch.is_terminal_indicators})
 
-          print('loss: {}, global step: {}'.format(loss, global_step))
+          print('loss: {}, global step: {}, action step: {}'.format(loss, global_step, action_step))
 
 
 def main(argv=None):
   if not tf.gfile.Exists(FLAGS.train_dir):
     tf.gfile.MakeDirs(FLAGS.train_dir)
 
-  # TODO: Need to add an observation hook to transform the 3 RGB channels to 1 channel
-  env = EnvWrapper(FLAGS.environment, render=FLAGS.render, obs_hook=lambda x: x)
+  env = EnvWrapper(FLAGS.environment, render=FLAGS.render, obs_hook=lambda x: np.mean(x, axis=-1, keepdims=True))
   train(env)
 
 
